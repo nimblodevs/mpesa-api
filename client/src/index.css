@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --mpesa-green: #49aa27;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 font-sans;
+}
+
+.btn-primary {
+  @apply bg-mpesa-green text-white px-4 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all;
+}
+
+.card {
+  @apply bg-white p-6 rounded-xl shadow-sm border border-slate-100;
+}
