@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { stkPush, getHistory } from '../api/mpesaApi';
+import { stkPush, getHistory, getRatibaList, b2cPayout, b2bPayout, reverseTransaction, syncManualTransaction, queryTransaction } from '../api/mpesaApi';
 import { History, Send, Smartphone, Activity, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PaymentForms from '../components/PaymentForms';
 import RatibaForm from '../components/RatibaForm';
 import QRGenerator from '../components/QRGenerator';
-import { getRatibaList } from '../api/mpesaApi';
 
 const Dashboard = () => {
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -16,8 +15,9 @@ const Dashboard = () => {
     const [ratibaList, setRatibaList] = useState([]);
     const [message, setMessage] = useState({ text: '', type: '' });
 
-    // New states for B2B and Sync
+    // New states for B2B, B2C and Sync
     const [b2bData, setB2bData] = useState({ receiverShortcode: '', amount: '' });
+    const [b2cData, setB2cData] = useState({ phoneNumber: '', amount: '' });
     const [syncID, setSyncID] = useState('');
 
     useEffect(() => {
@@ -100,6 +100,22 @@ const Dashboard = () => {
         }
     };
 
+    const handleB2C = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setMessage({ text: 'Processing B2C Payout...', type: 'info' });
+        try {
+            await b2cPayout(b2cData);
+            setMessage({ text: 'B2C Payout initiated!', type: 'success' });
+            setB2cData({ phoneNumber: '', amount: '' });
+            fetchHistory();
+        } catch (err) {
+            setMessage({ text: 'B2C payout failed.', type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSyncManual = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -111,6 +127,20 @@ const Dashboard = () => {
             fetchHistory();
         } catch (err) {
             setMessage({ text: 'Manual sync failed.', type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleQueryStatus = async (transactionID) => {
+        setLoading(true);
+        setMessage({ text: 'Querying transaction status...', type: 'info' });
+        try {
+            const res = await queryTransaction(transactionID);
+            setMessage({ text: `Status Query Response: ${res.data.ResultDesc || 'Request Sent'}`, type: 'info' });
+            fetchHistory();
+        } catch (err) {
+            setMessage({ text: 'Status query failed.', type: 'error' });
         } finally {
             setLoading(false);
         }
@@ -218,37 +248,77 @@ const Dashboard = () => {
                         </form>
                     </section>
 
-                    {/* B2B Section */}
+                    {/* B2B & B2C Section */}
                     <section className="card">
-                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <Send className="w-5 h-5 text-mpesa-green" />
-                            B2B Payout
-                        </h2>
-                        <form onSubmit={handleB2B} className="space-y-4">
-                            <input
-                                type="text"
-                                placeholder="Receiver Shortcode"
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-mpesa-green focus:border-transparent outline-none text-sm"
-                                value={b2bData.receiverShortcode}
-                                onChange={(e) => setB2bData({ ...b2bData, receiverShortcode: e.target.value })}
-                                required
-                            />
-                            <input
-                                type="number"
-                                placeholder="Amount"
-                                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-mpesa-green focus:border-transparent outline-none text-sm"
-                                value={b2bData.amount}
-                                onChange={(e) => setB2bData({ ...b2bData, amount: e.target.value })}
-                                required
-                            />
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                                Send B2B Payment
-                            </button>
-                        </form>
+                        <div className="flex gap-4 mb-4 border-b border-slate-100 pb-2">
+                            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Payouts</h2>
+                        </div>
+
+                        <div className="space-y-8">
+                            <div>
+                                <h3 className="text-md font-semibold mb-3 flex items-center gap-2">
+                                    <Send className="w-4 h-4 text-mpesa-green" />
+                                    B2B (Business Payout)
+                                </h3>
+                                <form onSubmit={handleB2B} className="space-y-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Receiver Shortcode"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-mpesa-green focus:border-transparent outline-none text-sm"
+                                        value={b2bData.receiverShortcode}
+                                        onChange={(e) => setB2bData({ ...b2bData, receiverShortcode: e.target.value })}
+                                        required
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Amount"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-mpesa-green focus:border-transparent outline-none text-sm"
+                                        value={b2bData.amount}
+                                        onChange={(e) => setB2bData({ ...b2bData, amount: e.target.value })}
+                                        required
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full btn-primary py-2 text-sm disabled:opacity-50"
+                                    >
+                                        Send B2B Payout
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-50">
+                                <h3 className="text-md font-semibold mb-3 flex items-center gap-2">
+                                    <Smartphone className="w-4 h-4 text-mpesa-green" />
+                                    B2C (Customer Payout)
+                                </h3>
+                                <form onSubmit={handleB2C} className="space-y-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Customer Phone (2547...)"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-mpesa-green focus:border-transparent outline-none text-sm"
+                                        value={b2cData.phoneNumber}
+                                        onChange={(e) => setB2cData({ ...b2cData, phoneNumber: e.target.value })}
+                                        required
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Amount"
+                                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-mpesa-green focus:border-transparent outline-none text-sm"
+                                        value={b2cData.amount}
+                                        onChange={(e) => setB2cData({ ...b2cData, amount: e.target.value })}
+                                        required
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full bg-mpesa-green text-white py-2 rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50"
+                                    >
+                                        Send B2C Payout
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </section>
                 </div>
 

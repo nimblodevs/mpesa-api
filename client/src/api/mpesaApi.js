@@ -17,6 +17,7 @@ export const getRatibaList = () => api.get('/ratiba/list');
 export const generateQR = (data) => api.post('/qrcode/generate', data);
 export const reverseTransaction = (data) => api.post('/reversal', data);
 export const b2bPayout = (data) => api.post('/b2b', data);
+export const b2cPayout = (data) => api.post('/b2c', data);
 export const syncManualTransaction = (transactionID) => api.post('/sync-manual', { transactionID });
 
 export default api;
